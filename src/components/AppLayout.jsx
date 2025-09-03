@@ -1,5 +1,4 @@
-import React from 'react';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import React, { useState } from 'react';
 import { 
   BarChart3, 
   Droplets, 
@@ -8,8 +7,8 @@ import {
   Menu,
   X
 } from 'lucide-react';
-import { useState } from 'react';
 import { SubscriptionBadge } from './SubscriptionBadge';
+import { ConnectWalletButton } from './ConnectWalletButton';
 
 export function AppLayout({ children, activeTab, setActiveTab }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -59,7 +58,7 @@ export function AppLayout({ children, activeTab, setActiveTab }) {
             {/* Right side */}
             <div className="flex items-center space-x-4">
               <SubscriptionBadge />
-              <ConnectButton />
+              <ConnectWalletButton />
               
               {/* Mobile menu button */}
               <button
