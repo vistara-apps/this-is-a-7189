@@ -1,4 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { 
+  fetchTokenPrices, 
+  fetchLiquidityPools, 
+  calculateOptimalRoute 
+} from '../services/api';
 
 const DataContext = createContext();
 
@@ -10,147 +15,140 @@ export function useData() {
   return context;
 }
 
-// Mock data - in real app, this would come from Airstack API
-const mockPrices = [
-  {
-    symbol: 'ETH',
-    name: 'Ethereum',
-    price: '1834.20',
-    change24h: 2.4,
-    chain: 'Ethereum',
-    bestExchange: 'Uniswap V3',
-  },
-  {
-    symbol: 'BTC',
-    name: 'Bitcoin',
-    price: '42150.00',
-    change24h: -1.2,
-    chain: 'Ethereum',
-    bestExchange: 'SushiSwap',
-  },
-  {
-    symbol: 'MATIC',
-    name: 'Polygon',
-    price: '0.85',
-    change24h: 5.7,
-    chain: 'Polygon',
-    bestExchange: 'QuickSwap',
-  },
-  {
-    symbol: 'ARB',
-    name: 'Arbitrum',
-    price: '1.23',
-    change24h: -0.8,
-    chain: 'Arbitrum',
-    bestExchange: 'Camelot',
-  },
-  {
-    symbol: 'OP',
-    name: 'Optimism',
-    price: '2.15',
-    change24h: 3.2,
-    chain: 'Optimism',
-    bestExchange: 'Velodrome',
-  },
-];
-
-const mockPools = [
-  {
-    poolId: '1',
-    protocol: 'Uniswap V3',
-    assetPair: 'ETH/USDC',
-    chainId: 'Ethereum',
-    liquidity: '$125.2M',
-    price: '1834.20',
-    apr: 12.5,
-  },
-  {
-    poolId: '2',
-    protocol: 'SushiSwap',
-    assetPair: 'BTC/USDC',
-    chainId: 'Ethereum',
-    liquidity: '$89.7M',
-    price: '42150.00',
-    apr: 8.3,
-  },
-  {
-    poolId: '3',
-    protocol: 'QuickSwap',
-    assetPair: 'MATIC/USDC',
-    chainId: 'Polygon',
-    liquidity: '$45.8M',
-    price: '0.85',
-    apr: 15.2,
-  },
-  {
-    poolId: '4',
-    protocol: 'Curve',
-    assetPair: 'USDC/USDT',
-    chainId: 'Ethereum',
-    liquidity: '$234.1M',
-    price: '1.0001',
-    apr: 4.7,
-  },
-  {
-    poolId: '5',
-    protocol: 'Balancer',
-    assetPair: 'ETH/BAL',
-    chainId: 'Ethereum',
-    liquidity: '$23.5M',
-    price: '1835.40',
-    apr: 18.9,
-  },
-  {
-    poolId: '6',
-    protocol: 'Camelot',
-    assetPair: 'ARB/USDC',
-    chainId: 'Arbitrum',
-    liquidity: '$67.3M',
-    price: '1.23',
-    apr: 22.1,
-  },
-];
-
 export function DataProvider({ children }) {
-  const [prices, setPrices] = useState(mockPrices);
-  const [pools, setPools] = useState(mockPools);
-  const [isLoading, setIsLoading] = useState(false);
+  const [prices, setPrices] = useState([]);
+  const [pools, setPools] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [savedPools, setSavedPools] = useState([]);
+  const [optimalRoutes, setOptimalRoutes] = useState([]);
 
-  const refreshPrices = async () => {
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Mock price updates
-    const updatedPrices = prices.map(price => ({
-      ...price,
-      price: (parseFloat(price.price) * (1 + (Math.random() - 0.5) * 0.02)).toFixed(2),
-      change24h: price.change24h + (Math.random() - 0.5) * 2,
-    }));
-    
-    setPrices(updatedPrices);
-    setIsLoading(false);
-  };
-
-  const refreshPools = async () => {
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsLoading(false);
-  };
-
-  // Simulate real-time updates
+  // Load initial data
   useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Fetch prices and pools in parallel
+        const [pricesData, poolsData] = await Promise.all([
+          fetchTokenPrices(),
+          fetchLiquidityPools()
+        ]);
+        
+        setPrices(pricesData);
+        setPools(poolsData);
+      } catch (err) {
+        console.error('Error loading initial data:', err);
+        setError('Failed to load data. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadInitialData();
+    
+    // Load saved pools from local storage
+    const loadSavedPools = () => {
+      try {
+        const saved = localStorage.getItem('savedPools');
+        if (saved) {
+          setSavedPools(JSON.parse(saved));
+        }
+      } catch (err) {
+        console.error('Error loading saved pools:', err);
+      }
+    };
+    
+    loadSavedPools();
+  }, []);
+
+  // Refresh prices
+  const refreshPrices = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const pricesData = await fetchTokenPrices({ skipCache: true });
+      setPrices(pricesData);
+    } catch (err) {
+      console.error('Error refreshing prices:', err);
+      setError('Failed to refresh prices. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Refresh pools
+  const refreshPools = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const poolsData = await fetchLiquidityPools({ skipCache: true });
+      setPools(poolsData);
+    } catch (err) {
+      console.error('Error refreshing pools:', err);
+      setError('Failed to refresh pools. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Save a pool to user's saved pools
+  const savePool = (poolId) => {
+    if (savedPools.includes(poolId)) return;
+    
+    const newSavedPools = [...savedPools, poolId];
+    setSavedPools(newSavedPools);
+    
+    try {
+      localStorage.setItem('savedPools', JSON.stringify(newSavedPools));
+    } catch (err) {
+      console.error('Error saving pool:', err);
+    }
+  };
+
+  // Remove a pool from user's saved pools
+  const removePool = (poolId) => {
+    const newSavedPools = savedPools.filter(id => id !== poolId);
+    setSavedPools(newSavedPools);
+    
+    try {
+      localStorage.setItem('savedPools', JSON.stringify(newSavedPools));
+    } catch (err) {
+      console.error('Error removing pool:', err);
+    }
+  };
+
+  // Get optimal routes for a trade
+  const getOptimalRoutes = async (fromToken, toToken, amount) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const routes = await calculateOptimalRoute({ fromToken, toToken, amount });
+      setOptimalRoutes(routes);
+      return routes;
+    } catch (err) {
+      console.error('Error calculating optimal routes:', err);
+      setError('Failed to calculate routes. Please try again later.');
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Real-time price updates (simulated)
+  useEffect(() => {
+    if (prices.length === 0) return;
+    
     const interval = setInterval(() => {
       if (!isLoading) {
-        const updatedPrices = prices.map(price => ({
-          ...price,
-          price: (parseFloat(price.price) * (1 + (Math.random() - 0.5) * 0.001)).toFixed(2),
-        }));
-        setPrices(updatedPrices);
+        refreshPrices();
       }
-    }, 30000); // Update every 30 seconds
-
+    }, 60000); // Update every minute
+    
     return () => clearInterval(interval);
   }, [prices, isLoading]);
 
@@ -159,8 +157,14 @@ export function DataProvider({ children }) {
       prices,
       pools,
       isLoading,
+      error,
+      savedPools,
+      optimalRoutes,
       refreshPrices,
       refreshPools,
+      savePool,
+      removePool,
+      getOptimalRoutes,
     }}>
       {children}
     </DataContext.Provider>

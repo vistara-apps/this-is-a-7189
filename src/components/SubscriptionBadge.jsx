@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Crown, Star } from 'lucide-react';
 import { useSubscription } from '../contexts/SubscriptionContext';
+import { SubscriptionModal } from './SubscriptionModal';
 
 export function SubscriptionBadge() {
-  const { subscription, upgradeSubscription } = useSubscription();
+  const { subscription } = useSubscription();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const getBadgeConfig = () => {
     switch (subscription.tier) {
@@ -31,21 +33,31 @@ export function SubscriptionBadge() {
   const config = getBadgeConfig();
   const Icon = config.icon;
 
+  const openModal = () => {
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+  };
+
   return (
-    <div className="flex items-center space-x-2">
-      <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1 ${config.className}`}>
-        {Icon && <Icon className="w-3 h-3" />}
-        <span>{config.text}</span>
-      </div>
-      
-      {subscription.tier === 'free' && (
+    <>
+      <div className="flex items-center space-x-2">
+        <div className={`px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1 ${config.className}`}>
+          {Icon && <Icon className="w-3 h-3" />}
+          <span>{config.text}</span>
+        </div>
+        
         <button
-          onClick={() => upgradeSubscription('pro')}
+          onClick={openModal}
           className="text-xs text-white/70 hover:text-white underline"
         >
-          Upgrade
+          {subscription.tier === 'free' ? 'Upgrade' : 'Manage'}
         </button>
-      )}
-    </div>
+      </div>
+      
+      <SubscriptionModal isOpen={isModalOpen} onClose={closeModal} />
+    </>
   );
 }
